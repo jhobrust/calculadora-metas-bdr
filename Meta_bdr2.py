@@ -84,7 +84,6 @@ def calcular_comissao(qtd_reunioes: int, meta: int) -> tuple[int, int, str]:
         return qtd_reunioes * 300, 300, "100%+ (R$ 300/reunião)"
 
 def fmt_brl(valor: int) -> str:
-    # Formata 12345 -> "R$ 12.345"
     return f"R$ {valor:,.0f}".replace(",", ".")
 
 # ----------------------------
@@ -139,7 +138,6 @@ faltam = max(int(meta - total_previsto), 0)
 atingimento_previsto = 0.0 if meta == 0 else (total_previsto / meta)
 atingimento_previsto_clamped = clamp(atingimento_previsto, 0, 1)
 
-# Necessário por dia útil (gap / dias restantes)
 if dias_uteis_restantes > 0:
     necessario_por_dia = faltam / dias_uteis_restantes
 else:
@@ -147,18 +145,15 @@ else:
 
 necessario_por_semana = necessario_por_dia * 5 if necessario_por_dia != float("inf") else float("inf")
 
-# Pacing (ideal até hoje) -> comparo com realizadas (não conto agendadas)
 ideal_ate_hoje = 0.0
 if dias_uteis_totais > 0 and meta > 0:
     ideal_ate_hoje = (meta / dias_uteis_totais) * dias_uteis_passados
 
-pace_diff = float(realizadas) - ideal_ate_hoje  # >0 adiantado, <0 atrasado
+pace_diff = float(realizadas) - ideal_ate_hoje
 
-# Comissão atual e projetada
 comissao_atual, valor_unit_atual, faixa_atual = calcular_comissao(realizadas, meta)
 comissao_proj, valor_unit_proj, faixa_proj = calcular_comissao(total_previsto, meta)
 
-# Cor e status baseados no esforço necessário
 cor_status, label_status = cor_por_status(necessario_por_dia if necessario_por_dia != float("inf") else 9999, faltam)
 
 # ----------------------------
@@ -167,25 +162,29 @@ cor_status, label_status = cor_por_status(necessario_por_dia if necessario_por_d
 with colB:
     st.subheader("Painel de Atingimento")
 
-    # Métricas (inclui os 2 cards de comissão)
-    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-    c1.metric("Meta do mês", f"{int(meta)}")
-    c2.metric("Realizado", f"{realizadas}")
-    c3.metric("Agendado", f"{agendadas}")
-    c4.metric("Previsto (real+agend)", f"{total_previsto}")
-    c5.metric("Faltam", f"{int(faltam)}")
-    c6.metric("💰 Comissão atual", fmt_brl(comissao_atual))
-    c7.metric("💰 Comissão projetada", fmt_brl(comissao_proj))
+    # Linha 1 - Performance (4 cards)
+    a1, a2, a3, a4 = st.columns(4)
+    a1.metric("Meta do mês", f"{int(meta)}")
+    a2.metric("Realizado", f"{realizadas}")
+    a3.metric("Agendado", f"{agendadas}")
+    a4.metric("Faltam", f"{int(faltam)}")
 
-    # Barra de progresso do previsto
-    st.markdown(barra_progresso_html(atingimento_previsto_clamped, cor_status), unsafe_allow_html=True)
-    st.write(f"**Atingimento:** {atingimento_previsto_clamped*100:.1f}% (considerando realizado + agendado)")
+    # Linha 2 - Comissão (2 cards bem destacados)
+    st.divider()
+    b1, b2 = st.columns(2)
+    b1.metric("💰 Comissão atual (realizadas)", fmt_brl(comissao_atual))
+    b2.metric("💰 Comissão projetada (real+agend)", fmt_brl(comissao_proj))
 
-    # Texto explicando comissão (bem claro)
     st.caption(
         f"Comissão atual: **{faixa_atual}** (valor atual: **R$ {valor_unit_atual}/reunião**). "
         f"Comissão projetada: **{faixa_proj}** (valor projetado: **R$ {valor_unit_proj}/reunião**)."
     )
+
+    st.divider()
+
+    # Barra de progresso (previsto)
+    st.markdown(barra_progresso_html(atingimento_previsto_clamped, cor_status), unsafe_allow_html=True)
+    st.write(f"**Atingimento:** {atingimento_previsto_clamped*100:.1f}% (considerando realizado + agendado)")
 
     st.divider()
 
@@ -221,7 +220,7 @@ with colB:
         else:
             st.error(f"{label_status} — faltam **{faltam}** reuniões e você precisa de **{necessario_por_dia:.2f}/dia útil**.")
 
-    # Incentivo: faltam p/ 70% e 100% (considera realizadas)
+    # Incentivo: faltam p/ 70% e 100% (somente realizadas)
     st.divider()
     if meta > 0:
         alvo_70 = int((0.70 * meta) + 0.9999)  # arredonda pra cima
