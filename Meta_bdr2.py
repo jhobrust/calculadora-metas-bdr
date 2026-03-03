@@ -5,6 +5,71 @@ import calendar
 st.set_page_config(page_title="Calculadora de Metas BDR", layout="wide")
 
 # ----------------------------
+# CSS (Cards KPI)
+# ----------------------------
+st.markdown("""
+<style>
+.kpi-card{
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+  height: 96px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+.kpi-top{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: rgba(255,255,255,0.75);
+}
+.kpi-value{
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.05;
+}
+.kpi-sub{
+  font-size: 12px;
+  color: rgba(255,255,255,0.60);
+}
+.kpi-bar{
+  width: 6px;
+  border-radius: 12px;
+  margin-right: 12px;
+}
+.kpi-wrap{
+  display:flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+/* deixa os cards "respirarem" um pouco mais em telas menores */
+@media (max-width: 1100px){
+  .kpi-card{ height: 104px; }
+  .kpi-value{ font-size: 30px; }
+}
+</style>
+""", unsafe_allow_html=True)
+
+def kpi_card(title: str, value: str, color: str, icon: str = "", subtitle: str = "") -> str:
+    return f"""
+    <div class="kpi-wrap">
+      <div class="kpi-bar" style="background:{color};"></div>
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <div>{icon} {title}</div>
+        </div>
+        <div class="kpi-value">{value}</div>
+        <div class="kpi-sub">{subtitle}</div>
+      </div>
+    </div>
+    """
+
+# ----------------------------
 # Config: metas por senioridade (AJUSTE AQUI)
 # ----------------------------
 METAS_REUNIOES = {
@@ -56,7 +121,7 @@ def barra_progresso_html(percent: float, cor: str) -> str:
           align-items:center;
           justify-content:center;
           color:white;
-          font-weight:700;
+          font-weight:800;
           font-size:14px;">
           {p:.1f}%
       </div>
@@ -82,6 +147,16 @@ def calcular_comissao(qtd_reunioes: int, meta: int) -> tuple[int, int, str]:
         return qtd_reunioes * 150, 150, "Entre 70% e 99% (R$ 150/reunião)"
     else:
         return qtd_reunioes * 300, 300, "100%+ (R$ 300/reunião)"
+
+def cor_comissao(qtd: int, meta: int) -> str:
+    if meta <= 0:
+        return "#9E9E9E"
+    pct = qtd / meta
+    if pct < 0.70:
+        return "#E53935"
+    if pct < 1.0:
+        return "#FB8C00"
+    return "#00C853"
 
 def fmt_brl(valor: int) -> str:
     return f"R$ {valor:,.0f}".replace(",", ".")
@@ -156,24 +231,44 @@ comissao_proj, valor_unit_proj, faixa_proj = calcular_comissao(total_previsto, m
 
 cor_status, label_status = cor_por_status(necessario_por_dia if necessario_por_dia != float("inf") else 9999, faltam)
 
+# Cores dos cards KPI
+cor_meta = "#7E57C2"
+cor_real = "#1E88E5"
+cor_agend = "#26A69A"
+cor_gap = "#00C853" if faltam == 0 else ("#FB8C00" if faltam <= 2 else "#E53935")
+
+cor_com_atual = cor_comissao(realizadas, meta)
+cor_com_proj = cor_comissao(total_previsto, meta)
+
 # ----------------------------
 # Painel
 # ----------------------------
 with colB:
     st.subheader("Painel de Atingimento")
 
-    # Linha 1 - Performance (4 cards)
-    a1, a2, a3, a4 = st.columns(4)
-    a1.metric("Meta do mês", f"{int(meta)}")
-    a2.metric("Realizado", f"{realizadas}")
-    a3.metric("Agendado", f"{agendadas}")
-    a4.metric("Faltam", f"{int(faltam)}")
+    # -------- Topo KPI (cards com cor) --------
+    t1, t2, t3, t4 = st.columns(4)
 
-    # Linha 2 - Comissão (2 cards bem destacados)
+    pct_real = 0 if meta == 0 else (realizadas / meta) * 100
+    pct_prev = 0 if meta == 0 else (total_previsto / meta) * 100
+
+    with t1:
+        st.markdown(kpi_card("Meta do mês", f"{int(meta)}", cor_meta, "🎯", "Reuniões"), unsafe_allow_html=True)
+    with t2:
+        st.markdown(kpi_card("Realizado", f"{realizadas}", cor_real, "✅", f"{pct_real:.0f}% da meta"), unsafe_allow_html=True)
+    with t3:
+        st.markdown(kpi_card("Agendado", f"{agendadas}", cor_agend, "📅", "Confirmadas no mês"), unsafe_allow_html=True)
+    with t4:
+        st.markdown(kpi_card("Faltam", f"{int(faltam)}", cor_gap, "⏳", "Para bater a meta"), unsafe_allow_html=True)
+
     st.divider()
-    b1, b2 = st.columns(2)
-    b1.metric("💰 Comissão atual (realizadas)", fmt_brl(comissao_atual))
-    b2.metric("💰 Comissão projetada (real+agend)", fmt_brl(comissao_proj))
+
+    # -------- Comissão (cards com cor) --------
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(kpi_card("Comissão atual", fmt_brl(comissao_atual), cor_com_atual, "💰", "Somente realizadas"), unsafe_allow_html=True)
+    with c2:
+        st.markdown(kpi_card("Comissão projetada", fmt_brl(comissao_proj), cor_com_proj, "🚀", "Real + agendadas"), unsafe_allow_html=True)
 
     st.caption(
         f"Comissão atual: **{faixa_atual}** (valor atual: **R$ {valor_unit_atual}/reunião**). "
@@ -182,13 +277,13 @@ with colB:
 
     st.divider()
 
-    # Barra de progresso (previsto)
+    # -------- Barra de progresso (previsto) --------
     st.markdown(barra_progresso_html(atingimento_previsto_clamped, cor_status), unsafe_allow_html=True)
-    st.write(f"**Atingimento:** {atingimento_previsto_clamped*100:.1f}% (considerando realizado + agendado)")
+    st.write(f"**Atingimento:** {pct_prev:.1f}% (considerando realizado + agendado)")
 
     st.divider()
 
-    # Ritmo necessário + ideal até hoje
+    # -------- Ritmo necessário + ideal --------
     colC, colD, colE = st.columns(3)
     if necessario_por_dia == float("inf"):
         colC.metric("Necessário por dia útil", "—")
@@ -209,7 +304,7 @@ with colB:
 
     st.divider()
 
-    # Card de status (visível)
+    # -------- Card de status --------
     if faltam <= 0:
         st.success("🎯 Meta batida! (considerando realizado + agendado)")
     else:
@@ -220,7 +315,7 @@ with colB:
         else:
             st.error(f"{label_status} — faltam **{faltam}** reuniões e você precisa de **{necessario_por_dia:.2f}/dia útil**.")
 
-    # Incentivo: faltam p/ 70% e 100% (somente realizadas)
+    # -------- Incentivo 70% e 100% (somente realizadas) --------
     st.divider()
     if meta > 0:
         alvo_70 = int((0.70 * meta) + 0.9999)  # arredonda pra cima
