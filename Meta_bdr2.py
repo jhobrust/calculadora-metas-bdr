@@ -73,9 +73,9 @@ def kpi_card(title: str, value: str, color: str, icon: str = "", subtitle: str =
 # Config: metas por senioridade (AJUSTE AQUI)
 # ----------------------------
 METAS_REUNIOES = {
-    "Junior": 20,
-    "Pleno": 30,
-    "Senior": 40,
+    "Junior": 12,
+    "Pleno": 17,
+    "Senior": 25,
 }
 
 # ----------------------------
@@ -328,3 +328,4 @@ with colB:
         colX.metric("Faltam para 70% (comissão)", f"{faltam_70}")
         colY.metric("Faltam para 100% (R$ 300/reunião)", f"{faltam_100}")
         st.caption("Obs.: os cards 70%/100% consideram **somente reuniões realizadas**.")
+
