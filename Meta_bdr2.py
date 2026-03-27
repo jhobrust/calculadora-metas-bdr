@@ -3,7 +3,7 @@ from datetime import date, timedelta
 import calendar
 import math
 
-st.set_page_config(page_title="Calculadora de Metas - Inside Sales", layout="wide")
+st.set_page_config(page_title="Calculadora de Metas - Inside Sales(reuniões realizadas)", layout="wide")
 
 # ============================
 # Configuração da política 2026
