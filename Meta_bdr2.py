@@ -3,7 +3,7 @@ from datetime import date, timedelta
 import calendar
 import math
 
-st.set_page_config(page_title="Calculadora de Metas - Inside Sales(reuniões realizadas)", layout="wide")
+st.set_page_config(page_title="Calculadora de Metas - Inside Sales(reuniões Qualificadas)", layout="wide")
 
 # ============================
 # Configuração da política 2026
@@ -221,13 +221,13 @@ with colA:
 
     if cargo == "BDR":
         st.markdown("### Produção BDR")
-        realizadas_outbound = st.number_input("Reuniões realizadas - Outbound", min_value=0, step=1, value=0)
-        realizadas_evento = st.number_input("Reuniões realizadas - Evento", min_value=0, step=1, value=0)
+        realizadas_outbound = st.number_input("Reuniões qualificadas - Outbound", min_value=0, step=1, value=0)
+        realizadas_evento = st.number_input("Reuniões qualificadas - Evento", min_value=0, step=1, value=0)
         agendadas_outbound = st.number_input("Reuniões agendadas - Outbound", min_value=0, step=1, value=0)
         agendadas_evento = st.number_input("Reuniões agendadas - Evento", min_value=0, step=1, value=0)
     else:
         st.markdown("### Produção SDR")
-        realizadas_inbound = st.number_input("Reuniões realizadas - Inbound", min_value=0, step=1, value=0)
+        realizadas_inbound = st.number_input("Reuniões qualificadas - Inbound", min_value=0, step=1, value=0)
         agendadas_inbound = st.number_input("Reuniões agendadas - Inbound", min_value=0, step=1, value=0)
 
     sobrescrever_meta = st.toggle("Sobrescrever meta", value=False)
