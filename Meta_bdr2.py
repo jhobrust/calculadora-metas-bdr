@@ -57,10 +57,10 @@ def fmt_pct(valor: float) -> str:
 
 def get_cor_atingimento(pct: float) -> str:
     if pct < 0.75:
-        return "#EF4444"  # vermelho
+        return "#EF4444"
     if pct < 1.0:
-        return "#F59E0B"  # amarelo
-    return "#10B981"  # verde
+        return "#F59E0B"
+    return "#10B981"
 
 
 def get_label_atingimento(pct: float) -> str:
@@ -154,18 +154,32 @@ def calcular_bonus_mensal(qtd_valida: int, meta: int, valor_referencia: float, v
     }
 
 
-def calcular_atingimento_bdr(out_real: int, evt_real: int, out_ag: int, evt_ag: int):
-    equiv_evento_real = evt_real // 2
-    equiv_evento_proj = (evt_real + evt_ag) // 2
+def calcular_atingimento_bdr(out_real: int, evt_real: int, out_ag: int, evt_ag: int, meta: int):
+    equiv_evento_real_float = evt_real / 2
+    realizado_valido_float = out_real + equiv_evento_real_float
 
-    realizado_valido = out_real + equiv_evento_real
-    projetado_valido = out_real + out_ag + equiv_evento_proj
+    # Regra especial:
+    # Se faltar exatamente 0.5 para bater a meta,
+    # arredonda para cima para permitir comissão no mês.
+    if meta - realizado_valido_float == 0.5:
+        realizado_valido = math.ceil(realizado_valido_float)
+    else:
+        realizado_valido = math.floor(realizado_valido_float)
+
+    equiv_evento_proj_float = (evt_real + evt_ag) / 2
+    projetado_valido_float = out_real + out_ag + equiv_evento_proj_float
+
+    # Mesma regra aplicada ao projetado.
+    if meta - projetado_valido_float == 0.5:
+        projetado_valido = math.ceil(projetado_valido_float)
+    else:
+        projetado_valido = math.floor(projetado_valido_float)
 
     return {
-        "realizado_valido": realizado_valido,
-        "projetado_valido": projetado_valido,
-        "equiv_evento_real": equiv_evento_real,
-        "equiv_evento_proj": equiv_evento_proj,
+        "realizado_valido": int(realizado_valido),
+        "projetado_valido": int(projetado_valido),
+        "equiv_evento_real": math.floor(equiv_evento_real_float),
+        "equiv_evento_proj": math.floor(equiv_evento_proj_float),
     }
 
 
@@ -257,6 +271,7 @@ if cargo == "BDR":
         int(realizadas_evento),
         int(agendadas_outbound),
         int(agendadas_evento),
+        int(meta),
     )
     realizadas_brutas = int(realizadas_outbound) + int(realizadas_evento)
     agendadas_brutas = int(agendadas_outbound) + int(agendadas_evento)
@@ -409,5 +424,5 @@ st.caption(
     "Regras implementadas: abaixo de 75% sem bônus; entre 75% e 100% bônus proporcional ao valor de referência; acima de 100% paga valor de referência cheio + excedente por reunião."
 )
 st.caption(
-    "Para BDR, reuniões de evento têm peso de 50%: a cada 2 reuniões de evento, 1 conta para a meta."
+    "Para BDR, reuniões de evento têm peso de 50%: a cada 2 reuniões de evento, 1 conta para a meta. Exceção: se faltar exatamente 0,5 para bater a meta mensal, arredonda para cima para comissão."
 )
