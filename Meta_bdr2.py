@@ -155,13 +155,17 @@ def calcular_bonus_mensal(qtd_valida: int, meta: int, valor_referencia: float, v
 
 
 def calcular_atingimento_bdr(out_real: int, evt_real: int, out_ag: int, evt_ag: int, meta: int):
+    alvo_75 = math.ceil(meta * 0.75)
+
     equiv_evento_real_float = evt_real / 2
     realizado_valido_float = out_real + equiv_evento_real_float
 
-    # Regra especial:
-    # Se faltar exatamente 0.5 para bater a meta,
-    # arredonda para cima para permitir comissão no mês.
-    if meta - realizado_valido_float == 0.5:
+    # REGRA ESPECIAL:
+    # Evento continua valendo 50%.
+    # Se faltar exatamente 0.5 para atingir 75% da meta,
+    # arredonda para cima para começar a comissionar.
+    # Essa regra NÃO vale para 100%.
+    if alvo_75 - realizado_valido_float == 0.5:
         realizado_valido = math.ceil(realizado_valido_float)
     else:
         realizado_valido = math.floor(realizado_valido_float)
@@ -169,8 +173,9 @@ def calcular_atingimento_bdr(out_real: int, evt_real: int, out_ag: int, evt_ag: 
     equiv_evento_proj_float = (evt_real + evt_ag) / 2
     projetado_valido_float = out_real + out_ag + equiv_evento_proj_float
 
-    # Mesma regra aplicada ao projetado.
-    if meta - projetado_valido_float == 0.5:
+    # Mesma regra aplicada ao projetado:
+    # arredonda somente se faltar 0.5 para atingir 75%.
+    if alvo_75 - projetado_valido_float == 0.5:
         projetado_valido = math.ceil(projetado_valido_float)
     else:
         projetado_valido = math.floor(projetado_valido_float)
@@ -424,5 +429,5 @@ st.caption(
     "Regras implementadas: abaixo de 75% sem bônus; entre 75% e 100% bônus proporcional ao valor de referência; acima de 100% paga valor de referência cheio + excedente por reunião."
 )
 st.caption(
-    "Para BDR, reuniões de evento têm peso de 50%: a cada 2 reuniões de evento, 1 conta para a meta. Exceção: se faltar exatamente 0,5 para bater a meta mensal, arredonda para cima para comissão."
+    "Para BDR, reuniões de evento têm peso de 50%: a cada 2 reuniões de evento, 1 conta para a meta. Exceção: se faltar exatamente 0,5 para atingir 75% da meta, arredonda para cima para iniciar comissão. Essa exceção não vale para 100%."
 )
