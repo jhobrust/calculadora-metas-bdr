@@ -3,16 +3,12 @@ from datetime import date, timedelta
 import calendar
 import math
 
-st.set_page_config(
-    page_title="Calculadora de Metas - Inside Sales",
-    layout="wide"
-)
+st.set_page_config(page_title="Calculadora de Metas - Inside Sales(reuniões Qualificadas)", layout="wide")
 
 # ============================
-# Política 2026 - Individual
-# BDR / SDR
+# Configuração da política 2026
 # ============================
-POLITICA_INDIVIDUAL = {
+POLITICA = {
     "BDR": {
         "JR": {"meta": 8, "valor_referencia": 1800.0, "valor_excedente": 150.0, "trimestral": 800.0},
         "PL": {"meta": 10, "valor_referencia": 2500.0, "valor_excedente": 150.0, "trimestral": 800.0},
@@ -26,62 +22,6 @@ POLITICA_INDIVIDUAL = {
 }
 
 # ============================
-# Política 2026 - Gestão / Time
-# ============================
-METAS_MENSAIS = {
-    "JAN": 76,
-    "FEV": 132,
-    "MAR": 135,
-    "ABR": 193,
-    "MAI": 223,
-    "JUN": 235,
-    "JUL": 241,
-    "AGO": 229,
-    "SET": 278,
-    "OUT": 228,
-    "NOV": 202,
-    "DEZ": 113,
-}
-
-POLITICA_GESTAO = {
-    "Supervisor 1 - 40%": {
-        "percentual_meta": 0.40,
-        "valor_referencia": 4000.0,
-    },
-    "Supervisor 2 - 60%": {
-        "percentual_meta": 0.60,
-        "valor_referencia": 4000.0,
-    },
-    "Gerente": {
-        "percentual_meta": 1.00,
-        "valor_referencia": 8000.0,
-    },
-    "LDR": {
-        "percentual_meta": 1.00,
-        "valor_referencia": 1500.0,
-    },
-    "Sales Enablement / IM": {
-        "percentual_meta": 1.00,
-        "valor_referencia": 2000.0,
-    },
-}
-
-MESES_PT = {
-    "JAN": "Janeiro",
-    "FEV": "Fevereiro",
-    "MAR": "Março",
-    "ABR": "Abril",
-    "MAI": "Maio",
-    "JUN": "Junho",
-    "JUL": "Julho",
-    "AGO": "Agosto",
-    "SET": "Setembro",
-    "OUT": "Outubro",
-    "NOV": "Novembro",
-    "DEZ": "Dezembro",
-}
-
-# ============================
 # Helpers
 # ============================
 def ultimo_dia_do_mes(d: date) -> date:
@@ -92,15 +32,12 @@ def ultimo_dia_do_mes(d: date) -> date:
 def dias_uteis(inicio: date, fim: date) -> int:
     if inicio > fim:
         return 0
-
     qtd = 0
     atual = inicio
-
     while atual <= fim:
         if atual.weekday() < 5:
             qtd += 1
         atual += timedelta(days=1)
-
     return qtd
 
 
@@ -131,20 +68,19 @@ def get_label_atingimento(pct: float) -> str:
         return "Abaixo do mínimo para bônus"
     if pct < 1.0:
         return "Faixa proporcional"
-    return "Meta batida"
+    return "Meta batida e acelerando"
 
 
 def mensagem_status(pct: float) -> str:
     if pct < 0.75:
         return "⚠️ Abaixo do mínimo para bonificação"
     if pct < 1.0:
-        return "🚀 Já entrou na faixa de bônus e está buscando 100%."
-    return "🔥 Meta batida!"
+        return "🚀 Quase lá! Você já entrou na faixa de bônus e está buscando 100%."
+    return "🔥 Meta batida! Agora cada excedente aumenta seu bônus."
 
 
 def barra_progresso_html(percent: float, cor: str) -> str:
     p = clamp(percent, 0, 1.2) * 100
-
     return f"""
     <div style="margin-top:4px;">
         <div style="background:#1F2937;border-radius:12px;height:24px;width:100%;overflow:hidden;">
@@ -182,16 +118,7 @@ def info_box_html(titulo: str, valor: str, fundo: str, cor_texto: str = "#F9FAFB
     """
 
 
-# ============================
-# Cálculos - Individual
-# BDR / SDR
-# ============================
-def calcular_bonus_mensal_individual(
-    qtd_valida: int,
-    meta: int,
-    valor_referencia: float,
-    valor_excedente: float
-):
+def calcular_bonus_mensal(qtd_valida: int, meta: int, valor_referencia: float, valor_excedente: float):
     if meta <= 0:
         return {
             "bonus": 0.0,
@@ -219,7 +146,6 @@ def calcular_bonus_mensal_individual(
         }
 
     excedente = max(qtd_valida - meta, 0)
-
     return {
         "bonus": valor_referencia + (excedente * valor_excedente),
         "pct": pct,
@@ -228,18 +154,17 @@ def calcular_bonus_mensal_individual(
     }
 
 
-def calcular_atingimento_bdr(
-    out_real: int,
-    evt_real: int,
-    out_ag: int,
-    evt_ag: int,
-    meta: int
-):
+def calcular_atingimento_bdr(out_real: int, evt_real: int, out_ag: int, evt_ag: int, meta: int):
     alvo_75 = math.ceil(meta * 0.75)
 
     equiv_evento_real_float = evt_real / 2
     realizado_valido_float = out_real + equiv_evento_real_float
 
+    # REGRA ESPECIAL:
+    # Evento continua valendo 50%.
+    # Se faltar exatamente 0.5 para atingir 75% da meta,
+    # arredonda para cima para começar a comissionar.
+    # Essa regra NÃO vale para 100%.
     if alvo_75 - realizado_valido_float == 0.5:
         realizado_valido = math.ceil(realizado_valido_float)
     else:
@@ -248,6 +173,8 @@ def calcular_atingimento_bdr(
     equiv_evento_proj_float = (evt_real + evt_ag) / 2
     projetado_valido_float = out_real + out_ag + equiv_evento_proj_float
 
+    # Mesma regra aplicada ao projetado:
+    # arredonda somente se faltar 0.5 para atingir 75%.
     if alvo_75 - projetado_valido_float == 0.5:
         projetado_valido = math.ceil(projetado_valido_float)
     else:
@@ -270,37 +197,6 @@ def calcular_atingimento_sdr(in_real: int, in_ag: int):
     }
 
 
-# ============================
-# Cálculos - Gestão / Time
-# ============================
-def calcular_bonus_gestao(
-    realizado: int,
-    meta: int,
-    valor_referencia: float
-):
-    if meta <= 0:
-        return {
-            "bonus": 0.0,
-            "pct": 0.0,
-            "faixa": "Sem meta definida",
-        }
-
-    pct = realizado / meta
-
-    if pct < 0.75:
-        return {
-            "bonus": 0.0,
-            "pct": pct,
-            "faixa": "Abaixo de 75%",
-        }
-
-    return {
-        "bonus": pct * valor_referencia,
-        "pct": pct,
-        "faixa": "A partir de 75% (proporcional ao atingimento)",
-    }
-
-
 def faltam_para_faixa(meta: int, realizado_valido: int, faixa: float) -> int:
     alvo = math.ceil(meta * faixa)
     return max(alvo - realizado_valido, 0)
@@ -318,434 +214,220 @@ dias_uteis_restantes = dias_uteis(hoje, fim_mes)
 dias_uteis_passados = max(dias_uteis_totais - dias_uteis_restantes, 0)
 
 # ============================
-# Header
+# Cabeçalho
 # ============================
 st.title("📈 Calculadora de Metas - Inside Sales")
-st.caption("Política mensal 2026 | BDR, SDR, Gestão, LDR e Sales Enablement / IM")
-
-tipo_calculo = st.radio(
-    "Selecione o tipo de cálculo",
-    [
-        "BDR / SDR - Produção Individual",
-        "Gestão / Time - Meta Geral do Mês",
-    ],
-    horizontal=True,
-)
+st.caption("Política mensal 2026 | BDR e SDR")
 
 colA, colB = st.columns([1, 2], gap="large")
 
 # ============================
-# Render - Individual
+# Entradas
 # ============================
-if tipo_calculo == "BDR / SDR - Produção Individual":
-    with colA:
-        st.subheader("Entradas")
+with colA:
+    st.subheader("Entradas")
 
-        cargo = st.selectbox("Cargo", list(POLITICA_INDIVIDUAL.keys()))
-        senioridade = st.selectbox("Senioridade", list(POLITICA_INDIVIDUAL[cargo].keys()))
+    cargo = st.selectbox("Cargo", list(POLITICA.keys()))
+    senioridade = st.selectbox("Senioridade", list(POLITICA[cargo].keys()))
 
-        config = POLITICA_INDIVIDUAL[cargo][senioridade]
+    config = POLITICA[cargo][senioridade]
+    meta_base = int(config["meta"])
+    valor_referencia = float(config["valor_referencia"])
+    valor_excedente = float(config["valor_excedente"])
+    bonus_trimestral = float(config["trimestral"])
 
-        meta_base = int(config["meta"])
-        valor_referencia = float(config["valor_referencia"])
-        valor_excedente = float(config["valor_excedente"])
-        bonus_trimestral = float(config["trimestral"])
-
-        st.divider()
-
-        if cargo == "BDR":
-            st.markdown("### Produção BDR")
-            realizadas_outbound = st.number_input("Reuniões qualificadas - Outbound", min_value=0, step=1, value=0)
-            realizadas_evento = st.number_input("Reuniões qualificadas - Evento", min_value=0, step=1, value=0)
-            agendadas_outbound = st.number_input("Reuniões agendadas - Outbound", min_value=0, step=1, value=0)
-            agendadas_evento = st.number_input("Reuniões agendadas - Evento", min_value=0, step=1, value=0)
-        else:
-            st.markdown("### Produção SDR")
-            realizadas_inbound = st.number_input("Reuniões qualificadas - Inbound", min_value=0, step=1, value=0)
-            agendadas_inbound = st.number_input("Reuniões agendadas - Inbound", min_value=0, step=1, value=0)
-
-        sobrescrever_meta = st.toggle("Sobrescrever meta", value=False)
-
-        if sobrescrever_meta:
-            meta = st.number_input("Meta mensal", min_value=0, step=1, value=meta_base)
-        else:
-            meta = meta_base
-
-        st.divider()
-        st.subheader("Parâmetros da política")
-        st.markdown(card_kpi("Meta base", str(meta_base)), unsafe_allow_html=True)
-        st.markdown(card_kpi("Valor de referência", fmt_brl(valor_referencia)), unsafe_allow_html=True)
-        st.markdown(card_kpi("Valor por excedente", fmt_brl(valor_excedente)), unsafe_allow_html=True)
-        st.markdown(card_kpi("Bônus trimestral por venda", fmt_brl(bonus_trimestral)), unsafe_allow_html=True)
-
-        st.divider()
-        st.caption(f"Hoje: {hoje.strftime('%d/%m/%Y')}")
-        st.caption(f"Dias úteis totais: {dias_uteis_totais}")
-        st.caption(f"Dias úteis restantes: {dias_uteis_restantes}")
+    st.divider()
 
     if cargo == "BDR":
-        calculos = calcular_atingimento_bdr(
-            int(realizadas_outbound),
-            int(realizadas_evento),
-            int(agendadas_outbound),
-            int(agendadas_evento),
-            int(meta),
-        )
-
-        realizadas_brutas = int(realizadas_outbound) + int(realizadas_evento)
-        agendadas_brutas = int(agendadas_outbound) + int(agendadas_evento)
-
+        st.markdown("### Produção BDR")
+        realizadas_outbound = st.number_input("Reuniões qualificadas - Outbound", min_value=0, step=1, value=0)
+        realizadas_evento = st.number_input("Reuniões qualificadas - Evento", min_value=0, step=1, value=0)
+        agendadas_outbound = st.number_input("Reuniões agendadas - Outbound", min_value=0, step=1, value=0)
+        agendadas_evento = st.number_input("Reuniões agendadas - Evento", min_value=0, step=1, value=0)
     else:
-        calculos = calcular_atingimento_sdr(
-            int(realizadas_inbound),
-            int(agendadas_inbound)
-        )
+        st.markdown("### Produção SDR")
+        realizadas_inbound = st.number_input("Reuniões qualificadas - Inbound", min_value=0, step=1, value=0)
+        agendadas_inbound = st.number_input("Reuniões agendadas - Inbound", min_value=0, step=1, value=0)
 
-        realizadas_brutas = int(realizadas_inbound)
-        agendadas_brutas = int(agendadas_inbound)
-
-    realizado_valido = int(calculos["realizado_valido"])
-    projetado_valido = int(calculos["projetado_valido"])
-    equiv_evento_real = int(calculos["equiv_evento_real"])
-    equiv_evento_proj = int(calculos["equiv_evento_proj"])
-
-    faltam_proj = max(meta - projetado_valido, 0)
-    faltam_real = max(meta - realizado_valido, 0)
-
-    atingimento_real = 0.0 if meta == 0 else realizado_valido / meta
-    atingimento_proj = 0.0 if meta == 0 else projetado_valido / meta
-
-    bonus_real = calcular_bonus_mensal_individual(
-        realizado_valido,
-        meta,
-        valor_referencia,
-        valor_excedente
-    )
-
-    bonus_proj = calcular_bonus_mensal_individual(
-        projetado_valido,
-        meta,
-        valor_referencia,
-        valor_excedente
-    )
-
-    cor_real = get_cor_atingimento(atingimento_real)
-    cor_proj = get_cor_atingimento(atingimento_proj)
-    label_real = get_label_atingimento(atingimento_real)
-    label_proj = get_label_atingimento(atingimento_proj)
-
-    if dias_uteis_totais > 0 and meta > 0:
-        ideal_ate_hoje = (meta / dias_uteis_totais) * dias_uteis_passados
+    sobrescrever_meta = st.toggle("Sobrescrever meta", value=False)
+    if sobrescrever_meta:
+        meta = st.number_input("Meta mensal", min_value=0, step=1, value=meta_base)
     else:
-        ideal_ate_hoje = 0.0
+        meta = meta_base
 
-    pace_diff = realizado_valido - ideal_ate_hoje
+    st.divider()
+    st.subheader("Parâmetros da política")
+    st.markdown(card_kpi("Meta base", str(meta_base)), unsafe_allow_html=True)
+    st.markdown(card_kpi("Valor de referência", fmt_brl(valor_referencia)), unsafe_allow_html=True)
+    st.markdown(card_kpi("Valor por excedente", fmt_brl(valor_excedente)), unsafe_allow_html=True)
+    st.markdown(card_kpi("Bônus trimestral por venda", fmt_brl(bonus_trimestral)), unsafe_allow_html=True)
 
-    if dias_uteis_restantes > 0:
-        necessario_por_dia = faltam_proj / dias_uteis_restantes
-    else:
-        necessario_por_dia = float("inf") if faltam_proj > 0 else 0.0
-
-    necessario_por_semana = necessario_por_dia * 5 if necessario_por_dia != float("inf") else float("inf")
-
-    faltam_75 = faltam_para_faixa(meta, realizado_valido, 0.75)
-    faltam_100 = faltam_para_faixa(meta, realizado_valido, 1.0)
-
-    with colB:
-        st.subheader("Painel de Atingimento")
-
-        p1, p2, p3, p4 = st.columns(4)
-        p1.markdown(card_kpi("Cargo", cargo), unsafe_allow_html=True)
-        p2.markdown(card_kpi("Senioridade", senioridade), unsafe_allow_html=True)
-        p3.markdown(card_kpi("Meta do mês", str(meta)), unsafe_allow_html=True)
-        p4.markdown(card_kpi("Valor ref.", fmt_brl(valor_referencia)), unsafe_allow_html=True)
-
-        st.divider()
-
-        a1, a2, a3, a4 = st.columns(4)
-        a1.markdown(card_kpi("Realizado válido", str(realizado_valido), cor_real), unsafe_allow_html=True)
-        a2.markdown(card_kpi("Projetado válido", str(projetado_valido), cor_proj), unsafe_allow_html=True)
-        a3.markdown(card_kpi("Faltam proj.", str(faltam_proj), "#10B981" if faltam_proj == 0 else "#EF4444"), unsafe_allow_html=True)
-        a4.markdown(card_kpi("Excedente proj.", str(bonus_proj["excedente"]), "#10B981"), unsafe_allow_html=True)
-
-        if cargo == "BDR":
-            st.divider()
-            e1, e2, e3, e4 = st.columns(4)
-            e1.markdown(card_kpi("Eventos realizados", f"🎟️ {int(realizadas_evento)}"), unsafe_allow_html=True)
-            e2.markdown(card_kpi("Eventos agendados", f"🗓️ {int(agendadas_evento)}"), unsafe_allow_html=True)
-            e3.markdown(card_kpi("Equiv. evento real", f"⚖️ {equiv_evento_real}"), unsafe_allow_html=True)
-            e4.markdown(card_kpi("Equiv. evento proj.", f"⚖️ {equiv_evento_proj}"), unsafe_allow_html=True)
-
-        st.divider()
-
-        b1, b2 = st.columns(2)
-
-        with b1:
-            st.markdown(card_kpi("Bônus atual", fmt_brl(bonus_real["bonus"]), cor_real), unsafe_allow_html=True)
-            st.caption(f"{label_real} | {bonus_real['faixa']} | {fmt_pct(atingimento_real)}")
-
-        with b2:
-            st.markdown(card_kpi("Bônus projetado", fmt_brl(bonus_proj["bonus"]), cor_proj), unsafe_allow_html=True)
-            st.caption(f"{label_proj} | {bonus_proj['faixa']} | {fmt_pct(atingimento_proj)}")
-
-        st.markdown(barra_progresso_html(atingimento_proj, cor_proj), unsafe_allow_html=True)
-        st.markdown(box_status_html(mensagem_status(atingimento_proj), cor_proj), unsafe_allow_html=True)
-
-        if bonus_proj["excedente"] > 0:
-            st.markdown(
-                info_box_html(
-                    "Acelerador projetado",
-                    f"💰 +{bonus_proj['excedente']} excedente(s) x {fmt_brl(valor_excedente)}",
-                    "#052e16",
-                    "#86EFAC",
-                ),
-                unsafe_allow_html=True,
-            )
-
-        st.divider()
-
-        r1, r2, r3 = st.columns(3)
-
-        if necessario_por_dia == float("inf"):
-            r1.markdown(card_kpi("Necessário por dia útil", "—"), unsafe_allow_html=True)
-            r2.markdown(card_kpi("Necessário por semana útil", "—"), unsafe_allow_html=True)
-        else:
-            r1.markdown(card_kpi("Necessário por dia útil", f"{necessario_por_dia:.2f}"), unsafe_allow_html=True)
-            r2.markdown(card_kpi("Necessário por semana útil", f"{necessario_por_semana:.2f}"), unsafe_allow_html=True)
-
-        r3.markdown(card_kpi("Ideal até hoje", f"{ideal_ate_hoje:.1f}"), unsafe_allow_html=True)
-
-        if meta == 0:
-            st.info("Defina uma meta para calcular ritmo e bônus.")
-        else:
-            if pace_diff >= 0:
-                st.success(f"Você está {pace_diff:.1f} reunião(ões) adiantado(a) vs. o ritmo ideal.")
-            else:
-                st.error(f"Você está {abs(pace_diff):.1f} reunião(ões) atrasado(a) vs. o ritmo ideal.")
-
-        st.divider()
-
-        i1, i2 = st.columns(2)
-        i1.markdown(card_kpi("Faltam para 75%", str(faltam_75), "#F59E0B" if faltam_75 > 0 else "#10B981"), unsafe_allow_html=True)
-        i2.markdown(card_kpi("Faltam para 100%", str(faltam_100), "#F59E0B" if faltam_100 > 0 else "#10B981"), unsafe_allow_html=True)
-
-        st.caption("Os cards de 75% e 100% consideram somente o realizado válido do mês.")
-
-        with st.expander("Ver memória de cálculo"):
-            if cargo == "BDR":
-                st.write(
-                    {
-                        "realizadas_outbound": int(realizadas_outbound),
-                        "realizadas_evento": int(realizadas_evento),
-                        "agendadas_outbound": int(agendadas_outbound),
-                        "agendadas_evento": int(agendadas_evento),
-                        "equiv_evento_real": equiv_evento_real,
-                        "equiv_evento_proj": equiv_evento_proj,
-                        "realizado_valido": realizado_valido,
-                        "projetado_valido": projetado_valido,
-                    }
-                )
-            else:
-                st.write(
-                    {
-                        "realizadas_inbound": int(realizadas_inbound),
-                        "agendadas_inbound": int(agendadas_inbound),
-                        "realizado_valido": realizado_valido,
-                        "projetado_valido": projetado_valido,
-                    }
-                )
+    st.divider()
+    st.caption(f"Hoje: {hoje.strftime('%d/%m/%Y')}")
+    st.caption(f"Dias úteis totais: {dias_uteis_totais}")
+    st.caption(f"Dias úteis restantes: {dias_uteis_restantes}")
 
 # ============================
-# Render - Gestão / Time
+# Cálculos
 # ============================
+if cargo == "BDR":
+    calculos = calcular_atingimento_bdr(
+        int(realizadas_outbound),
+        int(realizadas_evento),
+        int(agendadas_outbound),
+        int(agendadas_evento),
+        int(meta),
+    )
+    realizadas_brutas = int(realizadas_outbound) + int(realizadas_evento)
+    agendadas_brutas = int(agendadas_outbound) + int(agendadas_evento)
 else:
-    with colA:
-        st.subheader("Entradas")
+    calculos = calcular_atingimento_sdr(int(realizadas_inbound), int(agendadas_inbound))
+    realizadas_brutas = int(realizadas_inbound)
+    agendadas_brutas = int(agendadas_inbound)
 
-        cargo_gestao = st.selectbox("Cargo", list(POLITICA_GESTAO.keys()))
+realizado_valido = int(calculos["realizado_valido"])
+projetado_valido = int(calculos["projetado_valido"])
+equiv_evento_real = int(calculos["equiv_evento_real"])
+equiv_evento_proj = int(calculos["equiv_evento_proj"])
 
-        mes = st.selectbox(
-            "Mês da meta",
-            list(METAS_MENSAIS.keys()),
-            format_func=lambda x: f"{x} - {MESES_PT[x]}",
+faltam_proj = max(meta - projetado_valido, 0)
+faltam_real = max(meta - realizado_valido, 0)
+
+atingimento_real = 0.0 if meta == 0 else (realizado_valido / meta)
+atingimento_proj = 0.0 if meta == 0 else (projetado_valido / meta)
+
+bonus_real = calcular_bonus_mensal(realizado_valido, meta, valor_referencia, valor_excedente)
+bonus_proj = calcular_bonus_mensal(projetado_valido, meta, valor_referencia, valor_excedente)
+
+cor_real = get_cor_atingimento(atingimento_real)
+cor_proj = get_cor_atingimento(atingimento_proj)
+label_real = get_label_atingimento(atingimento_real)
+label_proj = get_label_atingimento(atingimento_proj)
+
+if dias_uteis_totais > 0 and meta > 0:
+    ideal_ate_hoje = (meta / dias_uteis_totais) * dias_uteis_passados
+else:
+    ideal_ate_hoje = 0.0
+
+pace_diff = realizado_valido - ideal_ate_hoje
+
+if dias_uteis_restantes > 0:
+    necessario_por_dia = faltam_proj / dias_uteis_restantes
+else:
+    necessario_por_dia = float("inf") if faltam_proj > 0 else 0.0
+
+necessario_por_semana = necessario_por_dia * 5 if necessario_por_dia != float("inf") else float("inf")
+
+faltam_75 = faltam_para_faixa(meta, realizado_valido, 0.75)
+faltam_100 = faltam_para_faixa(meta, realizado_valido, 1.0)
+
+# ============================
+# Painel
+# ============================
+with colB:
+    st.subheader("Painel de Atingimento")
+
+    p1, p2, p3, p4 = st.columns(4)
+    p1.markdown(card_kpi("Cargo", cargo), unsafe_allow_html=True)
+    p2.markdown(card_kpi("Senioridade", senioridade), unsafe_allow_html=True)
+    p3.markdown(card_kpi("Meta do mês", str(meta)), unsafe_allow_html=True)
+    p4.markdown(card_kpi("Valor ref.", fmt_brl(valor_referencia)), unsafe_allow_html=True)
+
+    st.divider()
+
+    a1, a2, a3, a4 = st.columns(4)
+    a1.markdown(card_kpi("Realizado válido", str(realizado_valido), cor_real), unsafe_allow_html=True)
+    a2.markdown(card_kpi("Projetado válido", str(projetado_valido), cor_proj), unsafe_allow_html=True)
+    a3.markdown(card_kpi("Faltam (proj.)", str(faltam_proj), "#10B981" if faltam_proj == 0 else "#EF4444"), unsafe_allow_html=True)
+    a4.markdown(card_kpi("Excedente proj.", str(bonus_proj["excedente"]), "#10B981"), unsafe_allow_html=True)
+
+    if cargo == "BDR":
+        st.divider()
+        e1, e2, e3, e4 = st.columns(4)
+        e1.markdown(card_kpi("Eventos realizados", f"🎟️ {int(realizadas_evento)}"), unsafe_allow_html=True)
+        e2.markdown(card_kpi("Eventos agendados", f"🗓️ {int(agendadas_evento)}"), unsafe_allow_html=True)
+        e3.markdown(card_kpi("Equiv. evento real", f"⚖️ {equiv_evento_real}"), unsafe_allow_html=True)
+        e4.markdown(card_kpi("Equiv. evento proj.", f"⚖️ {equiv_evento_proj}"), unsafe_allow_html=True)
+
+    st.divider()
+
+    b1, b2 = st.columns(2)
+    with b1:
+        st.markdown(card_kpi("Bônus atual", fmt_brl(bonus_real["bonus"]), cor_real), unsafe_allow_html=True)
+        st.caption(f"{label_real} | {bonus_real['faixa']} | {fmt_pct(atingimento_real)}")
+    with b2:
+        st.markdown(card_kpi("Bônus projetado", fmt_brl(bonus_proj["bonus"]), cor_proj), unsafe_allow_html=True)
+        st.caption(f"{label_proj} | {bonus_proj['faixa']} | {fmt_pct(atingimento_proj)}")
+
+    st.markdown(barra_progresso_html(atingimento_proj, cor_proj), unsafe_allow_html=True)
+    st.markdown(box_status_html(mensagem_status(atingimento_proj), cor_proj), unsafe_allow_html=True)
+
+    if bonus_proj["excedente"] > 0:
+        st.markdown(
+            info_box_html(
+                "Acelerador projetado",
+                f"💰 +{bonus_proj['excedente']} excedente(s) x {fmt_brl(valor_excedente)}",
+                "#052e16",
+                "#86EFAC",
+            ),
+            unsafe_allow_html=True,
         )
 
-        config_gestao = POLITICA_GESTAO[cargo_gestao]
+    st.divider()
 
-        meta_geral_mes = int(METAS_MENSAIS[mes])
-        percentual_meta = float(config_gestao["percentual_meta"])
-        valor_referencia = float(config_gestao["valor_referencia"])
-
-        meta_cargo = math.ceil(meta_geral_mes * percentual_meta)
-
-        st.divider()
-        st.markdown("### Produção do mês")
-
-        realizado_mes = st.number_input(
-            "Reuniões realizadas",
-            min_value=0,
-            step=1,
-            value=0,
-        )
-
-        projetado_mes = st.number_input(
-            "Reuniões projetadas / estimadas",
-            min_value=0,
-            step=1,
-            value=int(realizado_mes),
-            help="Use este campo para simular o fechamento do mês. Se não quiser projetar, deixe igual ao realizado.",
-        )
-
-        st.divider()
-        st.subheader("Parâmetros da política")
-        st.markdown(card_kpi("Meta geral do mês", str(meta_geral_mes)), unsafe_allow_html=True)
-        st.markdown(card_kpi("% da meta aplicado", fmt_pct(percentual_meta)), unsafe_allow_html=True)
-        st.markdown(card_kpi("Meta do cargo", str(meta_cargo)), unsafe_allow_html=True)
-        st.markdown(card_kpi("Valor de referência", fmt_brl(valor_referencia)), unsafe_allow_html=True)
-
-        st.divider()
-        st.caption("Regra: abaixo de 75% não bonifica. A partir de 75%, paga atingimento x valor referência.")
-
-    atingimento_real = 0.0 if meta_cargo == 0 else int(realizado_mes) / meta_cargo
-    atingimento_proj = 0.0 if meta_cargo == 0 else int(projetado_mes) / meta_cargo
-
-    bonus_real = calcular_bonus_gestao(
-        int(realizado_mes),
-        meta_cargo,
-        valor_referencia
-    )
-
-    bonus_proj = calcular_bonus_gestao(
-        int(projetado_mes),
-        meta_cargo,
-        valor_referencia
-    )
-
-    cor_real = get_cor_atingimento(atingimento_real)
-    cor_proj = get_cor_atingimento(atingimento_proj)
-
-    faltam_75 = faltam_para_faixa(meta_cargo, int(realizado_mes), 0.75)
-    faltam_100 = faltam_para_faixa(meta_cargo, int(realizado_mes), 1.0)
-
-    faltam_proj = max(meta_cargo - int(projetado_mes), 0)
-
-    excedente_real = max(int(realizado_mes) - meta_cargo, 0)
-    excedente_proj = max(int(projetado_mes) - meta_cargo, 0)
-
-    if dias_uteis_totais > 0 and meta_cargo > 0:
-        ideal_ate_hoje = (meta_cargo / dias_uteis_totais) * dias_uteis_passados
+    r1, r2, r3 = st.columns(3)
+    if necessario_por_dia == float("inf"):
+        r1.markdown(card_kpi("Necessário por dia útil", "—"), unsafe_allow_html=True)
+        r2.markdown(card_kpi("Necessário por semana útil", "—"), unsafe_allow_html=True)
     else:
-        ideal_ate_hoje = 0.0
+        r1.markdown(card_kpi("Necessário por dia útil", f"{necessario_por_dia:.2f}"), unsafe_allow_html=True)
+        r2.markdown(card_kpi("Necessário por semana útil", f"{necessario_por_semana:.2f}"), unsafe_allow_html=True)
+    r3.markdown(card_kpi("Ideal até hoje", f"{ideal_ate_hoje:.1f}"), unsafe_allow_html=True)
 
-    pace_diff = int(realizado_mes) - ideal_ate_hoje
-
-    if dias_uteis_restantes > 0:
-        necessario_por_dia = faltam_proj / dias_uteis_restantes
+    if meta == 0:
+        st.info("Defina uma meta para calcular ritmo e bônus.")
     else:
-        necessario_por_dia = float("inf") if faltam_proj > 0 else 0.0
-
-    necessario_por_semana = necessario_por_dia * 5 if necessario_por_dia != float("inf") else float("inf")
-
-    with colB:
-        st.subheader("Painel de Atingimento - Gestão / Time")
-
-        p1, p2, p3, p4 = st.columns(4)
-        p1.markdown(card_kpi("Cargo", cargo_gestao), unsafe_allow_html=True)
-        p2.markdown(card_kpi("Mês", mes), unsafe_allow_html=True)
-        p3.markdown(card_kpi("Meta cargo", str(meta_cargo)), unsafe_allow_html=True)
-        p4.markdown(card_kpi("Valor ref.", fmt_brl(valor_referencia)), unsafe_allow_html=True)
-
-        st.divider()
-
-        a1, a2, a3, a4 = st.columns(4)
-        a1.markdown(card_kpi("Realizado", str(int(realizado_mes)), cor_real), unsafe_allow_html=True)
-        a2.markdown(card_kpi("Projetado", str(int(projetado_mes)), cor_proj), unsafe_allow_html=True)
-        a3.markdown(card_kpi("Faltam proj.", str(faltam_proj), "#10B981" if faltam_proj == 0 else "#EF4444"), unsafe_allow_html=True)
-        a4.markdown(card_kpi("Excedente proj.", str(excedente_proj), "#10B981"), unsafe_allow_html=True)
-
-        st.divider()
-
-        b1, b2 = st.columns(2)
-
-        with b1:
-            st.markdown(card_kpi("Bônus atual", fmt_brl(bonus_real["bonus"]), cor_real), unsafe_allow_html=True)
-            st.caption(f"{bonus_real['faixa']} | {fmt_pct(atingimento_real)}")
-
-        with b2:
-            st.markdown(card_kpi("Bônus projetado", fmt_brl(bonus_proj["bonus"]), cor_proj), unsafe_allow_html=True)
-            st.caption(f"{bonus_proj['faixa']} | {fmt_pct(atingimento_proj)}")
-
-        st.markdown(barra_progresso_html(atingimento_proj, cor_proj), unsafe_allow_html=True)
-        st.markdown(box_status_html(mensagem_status(atingimento_proj), cor_proj), unsafe_allow_html=True)
-
-        if excedente_proj > 0:
-            valor_acima_100 = bonus_proj["bonus"] - valor_referencia
-
-            st.markdown(
-                info_box_html(
-                    "Excedente projetado",
-                    f"💰 {excedente_proj} reunião(ões) acima da meta | Valor acima de 100%: {fmt_brl(valor_acima_100)}",
-                    "#052e16",
-                    "#86EFAC",
-                ),
-                unsafe_allow_html=True,
-            )
-
-        st.divider()
-
-        r1, r2, r3 = st.columns(3)
-
-        if necessario_por_dia == float("inf"):
-            r1.markdown(card_kpi("Necessário por dia útil", "—"), unsafe_allow_html=True)
-            r2.markdown(card_kpi("Necessário por semana útil", "—"), unsafe_allow_html=True)
+        if pace_diff >= 0:
+            st.success(f"Você está {pace_diff:.1f} reunião(ões) adiantado(a) vs. o ritmo ideal.")
         else:
-            r1.markdown(card_kpi("Necessário por dia útil", f"{necessario_por_dia:.2f}"), unsafe_allow_html=True)
-            r2.markdown(card_kpi("Necessário por semana útil", f"{necessario_por_semana:.2f}"), unsafe_allow_html=True)
+            st.error(f"Você está {abs(pace_diff):.1f} reunião(ões) atrasado(a) vs. o ritmo ideal.")
 
-        r3.markdown(card_kpi("Ideal até hoje", f"{ideal_ate_hoje:.1f}"), unsafe_allow_html=True)
+    st.divider()
 
-        if meta_cargo == 0:
-            st.info("Defina uma meta para calcular ritmo e bônus.")
-        else:
-            if pace_diff >= 0:
-                st.success(f"Você está {pace_diff:.1f} reunião(ões) adiantado(a) vs. o ritmo ideal.")
-            else:
-                st.error(f"Você está {abs(pace_diff):.1f} reunião(ões) atrasado(a) vs. o ritmo ideal.")
+    i1, i2 = st.columns(2)
+    i1.markdown(card_kpi("Faltam para 75%", str(faltam_75), "#F59E0B" if faltam_75 > 0 else "#10B981"), unsafe_allow_html=True)
+    i2.markdown(card_kpi("Faltam para 100%", str(faltam_100), "#F59E0B" if faltam_100 > 0 else "#10B981"), unsafe_allow_html=True)
 
-        st.divider()
+    st.caption("Os cards de 75% e 100% consideram somente o realizado válido do mês.")
 
-        i1, i2 = st.columns(2)
-        i1.markdown(card_kpi("Faltam para 75%", str(faltam_75), "#F59E0B" if faltam_75 > 0 else "#10B981"), unsafe_allow_html=True)
-        i2.markdown(card_kpi("Faltam para 100%", str(faltam_100), "#F59E0B" if faltam_100 > 0 else "#10B981"), unsafe_allow_html=True)
-
-        st.caption("Para Gestão / Time, a origem da reunião não importa. O cálculo considera apenas reuniões realizadas contra a meta do cargo.")
-
-        with st.expander("Ver memória de cálculo"):
+    with st.expander("Ver memória de cálculo"):
+        if cargo == "BDR":
             st.write(
                 {
-                    "cargo": cargo_gestao,
-                    "mes": mes,
-                    "meta_geral_mes": meta_geral_mes,
-                    "percentual_meta": percentual_meta,
-                    "meta_cargo": meta_cargo,
-                    "valor_referencia": valor_referencia,
-                    "realizado_mes": int(realizado_mes),
-                    "projetado_mes": int(projetado_mes),
-                    "atingimento_real": atingimento_real,
-                    "atingimento_projetado": atingimento_proj,
-                    "bonus_real": bonus_real["bonus"],
-                    "bonus_projetado": bonus_proj["bonus"],
-                    "excedente_real": excedente_real,
-                    "excedente_projetado": excedente_proj,
+                    "realizadas_outbound": int(realizadas_outbound),
+                    "realizadas_evento": int(realizadas_evento),
+                    "agendadas_outbound": int(agendadas_outbound),
+                    "agendadas_evento": int(agendadas_evento),
+                    "equiv_evento_real": equiv_evento_real,
+                    "equiv_evento_proj": equiv_evento_proj,
+                    "realizado_valido": realizado_valido,
+                    "projetado_valido": projetado_valido,
+                }
+            )
+        else:
+            st.write(
+                {
+                    "realizadas_inbound": int(realizadas_inbound),
+                    "agendadas_inbound": int(agendadas_inbound),
+                    "realizado_valido": realizado_valido,
+                    "projetado_valido": projetado_valido,
                 }
             )
 
 st.divider()
-
 st.caption(
-    "BDR/SDR: regras originais preservadas. Abaixo de 75% sem bônus; entre 75% e 100% proporcional; acima de 100% valor referência + excedente por reunião."
+    "Regras implementadas: abaixo de 75% sem bônus; entre 75% e 100% bônus proporcional ao valor de referência; acima de 100% paga valor de referência cheio + excedente por reunião."
 )
-
 st.caption(
-    "Gestão/Time: abaixo de 75% sem bônus; a partir de 75% bônus proporcional ao atingimento x valor referência. Meta do cargo = meta geral do mês x percentual de responsabilidade."
+    "Para BDR, reuniões de evento têm peso de 50%: a cada 2 reuniões de evento, 1 conta para a meta. Exceção: se faltar exatamente 0,5 para atingir 75% da meta, arredonda para cima para iniciar comissão. Essa exceção não vale para 100%."
 )
